@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importador e Mapeador de Excel</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-weight: 600;
+            background: linear-gradient(135deg, #2d3548 0%, #4a5568 50%, #6b7280 100%);
+            min-height: 100vh;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: all 0.3s ease;
+        }
+
+        .section.collapsed .section-content {
+            display: none;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            padding: 10px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+
+        .section-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .section-title {
+            color: #ffffff;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .toggle-icon {
+            color: #ffffff;
+            font-size: 1.5rem;
+            transition: transform 0.3s;
+        }
+
+        .section.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .section-content {
+            margin-top: 20px;
+        }
+
+        .file-input-wrapper {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Estilo base para botões */
+        .btn {
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        /* Novo estilo gradiente */
+        .btn-grad {
+            background-image: linear-gradient(to right, #4CB8C4 0%, #3CD3AD  51%, #4CB8C4  100%);
+            margin: 10px;
+            padding: 15px 45px;
+            text-align: center;
+            text-transform: uppercase;
+            transition: 0.5s;
+            background-size: 200% auto;
+            color: white;            
+            box-shadow: 0 0 20px rgba(76, 184, 196, 0.5); /* Ajuste a cor do shadow para combinar */
+            border-radius: 10px;
+            display: inline-block; /* Alterado de block para inline-block para melhor controle */
+            border: none; /* Removendo a borda padrão do .btn */
+        }
+
+        .btn-grad:hover {
+            background-position: right center; /* change the direction of the change here */
+            color: #fff;
+            text-decoration: none;
+            box-shadow: 0 0 30px rgba(60, 211, 173, 0.7);
+        }
+
+        /* Estilos específicos para botões que não são gradiente */
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.8);
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 1);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .file-name {
+            color: #ffffff;
+            font-size: 0.95rem;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .mapping-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .mapping-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .mapping-label {
+            color: #ffffff;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        select, input[type="text"], input[type="number"] {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            color: #ffffff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.8);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        select option {
+            background: #2d3548;
+            color: #ffffff;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-top: 20px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1200px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            font-size: 0.85rem;
+        }
+
+        th {
+            background: rgba(99, 102, 241, 0.3);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .search-row th {
+            padding-top: 0;
+            padding-bottom: 10px;
+            background: rgba(99, 102, 241, 0.3);
+        }
+
+        .search-row input {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px;
+            color: #ffffff;
+            font-size: 0.85rem;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        td input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 6px;
+            font-size: 0.85rem;
+        }
+
+        /* Ajuste de Largura das Colunas */
+        /* Código Produto */
+        #dataTable th:nth-child(2), #dataTable td:nth-child(2) {
+            min-width: 150px;
+        }
+        /* Descrição Produto */
+        #dataTable th:nth-child(3), #dataTable td:nth-child(3) {
+            min-width: 300px; /* Aumentado para melhor visualização */
+        }
+        /* Cód Interno Produto (12ª coluna de dados, 13ª na tabela contando o checkbox) */
+        #dataTable th:nth-child(13), #dataTable td:nth-child(13) {
+            min-width: 150px;
+        }
+        /* CNPJ Fornecedor (13ª coluna de dados, 14ª na tabela contando o checkbox) */
+        #dataTable th:nth-child(14), #dataTable td:nth-child(14) {
+            min-width: 150px;
+        }
+
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            background: rgba(99, 102, 241, 0.6);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: rgba(99, 102, 241, 1);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .pagination span {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .utility-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .utility-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        /* Novo estilo para alinhar campos e botões */
+        .utility-fields {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            margin-bottom: 20px; /* Espaço entre campos e botões de ação */
+        }
+
+        .utility-fields .utility-item {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .utility-action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .utility-buttons-container {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+        }
+
+        .stat-value {
+            color: #ffffff;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Progress Bar Styles */
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress-bar-wrapper {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            height: 40px;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 15px;
+        }
+
+        .progress-text {
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.9rem;
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 2;
+        }
+
+        .progress-label {
+            color: #ffffff;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #2d3548 0%, #4a5568 100%);
+            margin: 10% auto;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            color: #ffffff;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            color: #ffffff;
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .close {
+            color: #ffffff;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 20px;
+        }
+
+        .close:hover {
+            color: #ef4444;
+        }
+
+        /* Checkbox style */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #3CD3AD;
+        }
+
+        @media (max-width: 768px) {
+            .mapping-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Importador e Mapeador de Excel</h1>
+
+        <!-- Seção de Importação -->
+        <div class="section collapsed">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2 class="section-title">1. Importar Arquivo Excel</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <div class="file-input-wrapper">
+                    <label for="fileInput" class="btn-grad">Selecionar Arquivo Excel</label>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)">
+                    <span id="fileName" class="file-name">Nenhum arquivo selecionado</span>
+                </div>
+                <div class="progress-container" id="loadProgress">
+                    <div class="progress-label">Carregando arquivo...</div>
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar" id="loadProgressBar" style="width: 0%"></div>
+                        <div class="progress-text" id="loadProgressText">0%</div>
+                    </div>
+                </div>
+                <div class="stats" id="importStats" style="display: none;">
+                    <div class="stat-item">
+                        <div class="stat-label">Linhas Importadas</div>
+                        <div class="stat-value" id="rowCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Colunas Detectadas</div>
+                        <div class="stat-value" id="colCount">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção de Mapeamento -->
+        <div class="section collapsed">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2 class="section-title">2. Mapeamento de Campos (De-Para)</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <div class="mapping-grid" id="mappingGrid"></div>
+                <div class="progress-container" id="mappingProgress">
+                    <div class="progress-label">Aplicando Mapeamento...</div>
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar" id="mappingProgressBar" style="width: 0%"></div>
+                        <div class="progress-text" id="mappingProgressText">0%</div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button class="btn-grad" onclick="applyMapping()">Aplicar Mapeamento</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção de Utilitários (Apenas controles de preenchimento) -->
+        <div class="section collapsed">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2 class="section-title">3. Utilitários</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <div class="utility-fields">
+                    <div class="utility-item">
+                        <label class="mapping-label">Selecionar Campo</label>
+                        <select id="utilityField">
+                            <option value="">-- Selecione --</option>
+                        </select>
+                    </div>
+                    <div class="utility-item">
+                        <label class="mapping-label">Valor para Preencher</label>
+                        <input type="text" id="utilityValue" placeholder="Digite o valor">
+                    </div>
+                </div>
+                <div class="utility-action-buttons">
+                    <button class="btn-grad" onclick="fillEmptyFields('selected')">Preencher Selecionadas</button>
+                    <button class="btn-grad" onclick="fillEmptyFields('all')">Preencher Todas</button>
+                    <button class="btn-grad" onclick="fillEmptyFields('empty')">Preencher Vazias</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção de Dados Gerados -->
+        <div class="section collapsed">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2 class="section-title">4. Dados Gerados</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="section-content">
+                <div class="table-wrapper">
+                    <table id="dataTable">
+                        <thead>
+                            <tr id="headerRow"></tr>
+                            <tr id="searchRow" class="search-row"></tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button onclick="changePage(-1)" id="prevBtn">❮❮ Anterior</button>
+                    <span id="pageInfo">Página 1 de 1</span>
+                    <button onclick="changePage(1)" id="nextBtn">Próxima ❯❯</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Botões de Utilitários (Movidos para o final do HTML) -->
+        <div class="utility-buttons-container">
+            <button class="btn-grad" onclick="exportToExcel()">Exportar Excel</button>
+            <button class="btn-grad" onclick="showExportModal()">Exportar TXT</button>
+        </div>
+    </div>
+
+    <!-- Modal de Exportação TXT -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeExportModal()">&times;</span>
+                Exportar para TXT
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Selecione o Separador:</label>
+                    <select id="separatorSelect">
+                        <option value=";">Ponto e vírgula (;)</option>
+                        <option value=",">Vírgula (,)</option>
+                        <option value="\t">Tabulação (Tab)</option>
+                        <option value="|">Pipe (|)</option>
+                    </select>
+                </div>
+                <div class="progress-container" id="exportProgress">
+                    <div class="progress-label">Exportando arquivo...</div>
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar" id="exportProgressBar" style="width: 0%"></div>
+                        <div class="progress-text" id="exportProgressText">0%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-grad" onclick="closeExportModal()">Cancelar</button>
+                <button class="btn-grad" onclick="exportToTxt()">Exportar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variáveis globais
+        let excelData = [];
+        let mappedData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        const rowsPerPage = 30;
+        let columnHeaders = [];
+        let searchFilters = {};
+        let nextRowId = 0;
+        // Armazena os IDs das linhas selecionadas
+        let selectedRowIds = new Set(); 
+
+        const targetFields = [
+            'Código Produto',
+            'Descrição Produto',
+            'Unidade Medida',
+            'NCM',
+            'CEST',
+            'Conta Contábil Estoque',
+            'Quantidade',
+            'Vl Unit Produto',
+            'Vl tot Produto',
+            'ICMS Recuperável Prod',
+            'Cód Interno Produto',
+            'CNPJ Fornecedor',
+            'Cod Prod Fornecedor'
+        ];
+
+        // Toggle de seções
+        function toggleSection(header) {
+            const section = header.parentElement;
+            section.classList.toggle('collapsed');
+        }
+
+        // Simular progresso
+        function simulateProgress(progressBarId, progressTextId, callback) {
+            const progressBar = document.getElementById(progressBarId);
+            const progressText = document.getElementById(progressTextId);
+            let progress = 0;
+
+            const interval = setInterval(() => {
+                progress += Math.random() * 30;
+                if (progress > 100) progress = 100;
+
+                progressBar.style.width = progress + '%';
+                progressText.textContent = Math.round(progress) + '%';
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    if (callback) setTimeout(callback, 300);
+                }
+            }, 100);
+        }
+
+        // Manipulação de arquivo
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('loadProgress').style.display = 'block';
+            document.getElementById('importStats').style.display = 'none';
+
+            simulateProgress('loadProgressBar', 'loadProgressText', () => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    excelData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                    if (excelData.length > 0) {
+                        columnHeaders = excelData[0];
+                        excelData = excelData.slice(1);
+
+                        document.getElementById('rowCount').textContent = excelData.length;
+                        document.getElementById('colCount').textContent = columnHeaders.length;
+                        document.getElementById('importStats').style.display = 'flex';
+                        document.getElementById('loadProgress').style.display = 'none';
+
+                        createMappingInterface();
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // Normalizar string para comparação
+        function normalizeString(str) {
+            if (!str) return '';
+            return str.toString().toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]/g, '');
+        }
+
+        // Criar interface de mapeamento com auto-seleção
+        function createMappingInterface() {
+            const mappingGrid = document.getElementById('mappingGrid');
+            mappingGrid.innerHTML = '';
+
+            targetFields.forEach(field => {
+                const div = document.createElement('div');
+                div.className = 'mapping-item';
+                
+                // Tentar encontrar correspondência automática
+                const normalizedField = normalizeString(field);
+                let selectedIndex = '';
+                
+                columnHeaders.forEach((col, idx) => {
+                    const normalizedCol = normalizeString(col);
+                    // Correspondência exata ou parcial
+                    if (normalizedCol === normalizedField || normalizedCol.includes(normalizedField) || normalizedField.includes(normalizedCol)) {
+                        selectedIndex = idx;
+                    }
+                });
+
+                div.innerHTML = `
+                    <label class="mapping-label">${field}</label>
+                    <select id="map_${field.replace(/\s+/g, '_')}">
+                        <option value="">-- Não mapear --</option>
+                        ${columnHeaders.map((col, idx) => 
+                            `<option value="${idx}" ${idx === selectedIndex ? 'selected' : ''}>${col}</option>`
+                        ).join('')}
+                    </select>
+                `;
+                mappingGrid.appendChild(div);
+            });
+        }
+
+        // Aplicar mapeamento com barra de progresso
+        function applyMapping() {
+            document.getElementById('mappingProgress').style.display = 'block';
+
+            simulateProgress('mappingProgressBar', 'mappingProgressText', () => {
+                mappedData = [];
+                nextRowId = 0; // Resetar ID ao mapear
+                selectedRowIds.clear(); // Limpar seleção
+
+                excelData.forEach(row => {
+                    const mappedRow = { id: nextRowId++ }; // Adicionar ID único
+                    targetFields.forEach(field => {
+                        const selectId = `map_${field.replace(/\s+/g, '_')}`;
+                        const select = document.getElementById(selectId);
+                        const colIndex = select.value;
+                        mappedRow[field] = colIndex !== '' ? (row[parseInt(colIndex)] || '') : '';
+                    });
+                    mappedData.push(mappedRow);
+                });
+
+                filterTable(); // Chama filterTable para inicializar filteredData e renderizar
+                populateUtilityFields();
+                document.getElementById('mappingProgress').style.display = 'none';
+            });
+        }
+
+        // Função para selecionar/desselecionar uma linha
+        function toggleRowSelection(rowId, isChecked) {
+            const id = parseInt(rowId);
+            if (isChecked) {
+                selectedRowIds.add(id);
+            } else {
+                selectedRowIds.delete(id);
+            }
+            // Atualiza o checkbox "Selecionar Todos"
+            updateSelectAllCheckbox();
+        }
+
+        // Função para selecionar/desselecionar todas as linhas visíveis
+        function toggleSelectAll(checkbox) {
+            const isChecked = checkbox.checked;
+            const checkboxes = document.querySelectorAll('#tableBody input[type="checkbox"]');
+            
+            checkboxes.forEach(cb => {
+                const rowId = cb.value;
+                cb.checked = isChecked;
+                toggleRowSelection(rowId, isChecked);
+            });
+        }
+
+        // Atualiza o estado do checkbox "Selecionar Todos"
+        function updateSelectAllCheckbox() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            if (!selectAllCheckbox) return;
+
+            const visibleCheckboxes = document.querySelectorAll('#tableBody input[type="checkbox"]');
+            const visibleIds = Array.from(visibleCheckboxes).map(cb => parseInt(cb.value));
+            
+            let allVisibleSelected = true;
+            let anyVisibleSelected = false;
+
+            if (visibleIds.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                return;
+            }
+
+            visibleIds.forEach(id => {
+                if (selectedRowIds.has(id)) {
+                    anyVisibleSelected = true;
+                } else {
+                    allVisibleSelected = false;
+                }
+            });
+
+            if (allVisibleSelected) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (anyVisibleSelected) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+
+        // Renderizar tabela
+        function renderTable() {
+            const headerRow = document.getElementById('headerRow');
+            const searchRow = document.getElementById('searchRow');
+            const tableBody = document.getElementById('tableBody');
+
+            // Cabeçalho
+            headerRow.innerHTML = `
+                <th>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)">
+                    </div>
+                </th>
+                ${targetFields.map(field => `<th>${field}</th>`).join('')}
+                <th>Ações</th>
+            `;
+
+            // Linha de pesquisa
+            searchRow.innerHTML = `
+                <th></th>
+                ${targetFields.map(field => `
+                    <th>
+                        <input type="text" 
+                               placeholder="Pesquisar..." 
+                               oninput="handleSearch(this.value, '${field}')"
+                               value="${searchFilters[field] || ''}">
+                    </th>
+                `).join('')}
+                <th></th>
+            `;
+
+            // Corpo da tabela
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageData = filteredData.slice(start, end);
+
+            tableBody.innerHTML = pageData.map((row, idx) => {
+                const rowId = row.id;
+                const isSelected = selectedRowIds.has(rowId);
+
+                return `
+                    <tr data-row-id="${rowId}">
+                        <td>
+                            <div class="checkbox-container">
+                                <input type="checkbox" value="${rowId}" ${isSelected ? 'checked' : ''} onchange="toggleRowSelection(this.value, this.checked)">
+                            </div>
+                        </td>
+                        ${targetFields.map(field => 
+                            `<td><input type="text" value="${row[field] || ''}" onchange="updateCell(${rowId}, '${field}', this.value)"></td>`
+                        ).join('')}
+                        <td><button class="btn-danger" onclick="deleteRow(${rowId})">🗑️ Excluir</button></td>
+                    </tr>
+                `;
+            }).join('');
+
+            updatePagination();
+            updateSelectAllCheckbox(); // Atualiza o estado do checkbox principal após a renderização
+        }
+
+        // Lógica de Pesquisa
+        function handleSearch(value, field) {
+            if (value) {
+                searchFilters[field] = value.toLowerCase();
+            } else {
+                delete searchFilters[field];
+            }
+            filterTable();
+        }
+
+        // Lógica de Filtragem
+        function filterTable() {
+            let tempFilteredData = [...mappedData];
+            const activeFilters = Object.keys(searchFilters).filter(key => searchFilters[key]);
+
+            if (activeFilters.length > 0) {
+                tempFilteredData = mappedData.filter(row => {
+                    return activeFilters.every(field => {
+                        const filterValue = searchFilters[field];
+                        const rowValue = row[field] ? row[field].toString().toLowerCase() : '';
+                        return rowValue.includes(filterValue);
+                    });
+                });
+            }
+
+            filteredData = tempFilteredData;
+            currentPage = 1;
+            renderTable();
+        }
+
+        // Encontrar o índice no mappedData pelo ID
+        function findMappedIndexById(id) {
+            return mappedData.findIndex(row => row.id === id);
+        }
+
+        // Atualizar célula (usando ID único)
+        function updateCell(rowId, field, value) {
+            const originalIndex = findMappedIndexById(rowId);
+            if (originalIndex !== -1) {
+                mappedData[originalIndex][field] = value;
+                // A atualização do filteredData é feita implicitamente na próxima renderTable
+                // Mas para consistência imediata, podemos atualizar aqui também
+                const filteredIndex = filteredData.findIndex(row => row.id === rowId);
+                if (filteredIndex !== -1) {
+                    filteredData[filteredIndex][field] = value;
+                }
+            }
+        }
+
+        // Deletar linha (usando ID único)
+        function deleteRow(rowId) {
+            const originalIndex = findMappedIndexById(rowId);
+            if (originalIndex !== -1) {
+                mappedData.splice(originalIndex, 1);
+                selectedRowIds.delete(rowId); // Remove da seleção
+                filterTable(); // Re-aplica o filtro e re-renderiza a tabela
+            }
+        }
+
+        // Paginação
+        function changePage(direction) {
+            const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+            currentPage += direction;
+            if (currentPage < 1) currentPage = 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            renderTable();
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredData.length / rowsPerPage) || 1;
+            document.getElementById('pageInfo').textContent = `Página ${currentPage} de ${totalPages}`;
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = currentPage === totalPages;
+        }
+
+        // Preencher campos vazios
+        function populateUtilityFields() {
+            const select = document.getElementById('utilityField');
+            select.innerHTML = '<option value="">-- Selecione --</option>' +
+                targetFields.map(field => `<option value="${field}">${field}</option>`).join('');
+        }
+
+        // Preencher campos vazios (LÓGICA COM ESCOPO)
+        function fillEmptyFields(scope) {
+            const field = document.getElementById('utilityField').value;
+            const value = document.getElementById('utilityValue').value;
+
+            if (!field || value === '') {
+                alert('Por favor, selecione um campo e digite um valor.');
+                return;
+            }
+
+            let changesMade = 0;
+            
+            mappedData.forEach(row => {
+                let shouldApply = false;
+
+                if (scope === 'all') {
+                    shouldApply = true;
+                } else if (scope === 'selected') {
+                    if (selectedRowIds.has(row.id)) {
+                        shouldApply = true;
+                    }
+                } else if (scope === 'empty') {
+                    if (!row[field] || row[field].toString().trim() === '') {
+                        shouldApply = true;
+                    }
+                }
+
+                if (shouldApply) {
+                    row[field] = value;
+                    changesMade++;
+                }
+            });
+
+            filterTable(); // Re-aplica o filtro e re-renderiza a tabela
+            alert(`Campo "${field}" preenchido em ${changesMade} linhas (Escopo: ${scope}) com sucesso!`);
+        }
+
+        // Exportar para Excel
+        function exportToExcel() {
+            if (mappedData.length === 0) {
+                alert('Não há dados para exportar.');
+                return;
+            }
+
+            // Remover o campo 'id' antes de exportar
+            const dataToExport = mappedData.map(row => {
+                const { id, ...rest } = row;
+                return rest;
+            }
+            );
+
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Dados Mapeados');
+            XLSX.writeFile(wb, 'dados_mapeados.xlsx');
+        }
+
+        // Modal de exportação TXT
+        function showExportModal() {
+            if (mappedData.length === 0) {
+                alert('Não há dados para exportar.');
+                return;
+            }
+            document.getElementById('exportModal').style.display = 'block';
+            document.getElementById('exportProgress').style.display = 'none';
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').style.display = 'none';
+        }
+
+        // Exportar para TXT
+        function exportToTxt() {
+            const separator = document.getElementById('separatorSelect').value;
+            document.getElementById('exportProgress').style.display = 'block';
+
+            simulateProgress('exportProgressBar', 'exportProgressText', () => {
+                // Criar conteúdo do arquivo (sem cabeçalho)
+                const lines = mappedData.map(row => {
+                    return targetFields.map(field => {
+                        const value = row[field] || '';
+                        return value.toString();
+                    }).join(separator);
+                });
+
+                const content = lines.join('\n');
+
+                // Criar blob e download
+                // Usando windows-1252 para simular ANSI
+                const blob = new Blob([content], { type: 'text/plain;charset=windows-1252' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'dados_exportados.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                setTimeout(() => {
+                    closeExportModal();
+                    alert('Arquivo TXT exportado com sucesso!');
+                }, 500);
+            });
+        }
+
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('exportModal');
+            if (event.target == modal) {
+                closeExportModal();
+            }
+        }
+    </script>
+</body>
+</html>
